@@ -126,21 +126,27 @@ class LogStash::Outputs::ClickHouse < LogStash::Outputs::Base
     buffer_receive(event)
   end
 
-  def mutate( src )
+  def mutate( src, event )
     res = {}
     @mutations.each_pair do |dstkey, source|
       case source
         when String then
           scrkey = source
-          next unless src.key?(scrkey)
-
-          res[dstkey] = src[scrkey]
+          if src.key?(scrkey)          
+            res[dstkey] = src[scrkey]
+          else
+            res[dstkey] = event.sprintf(scrkey)
+          end
         when Array then
           scrkey = source[0]
-          next unless src.key?(scrkey)
+          if src.key?(scrkey)          
+            srcval = src[scrkey]
+          else
+            srcval = event.sprintf(scrkey)
+          end
           pattern = source[1]
           replace = source[2]
-          res[dstkey] = src[scrkey].sub( Regexp.new(pattern), replace )
+          res[dstkey] = srcval.sub( Regexp.new(pattern), replace )
       end
     end
     res
@@ -151,7 +157,8 @@ class LogStash::Outputs::ClickHouse < LogStash::Outputs::Base
     documents = ""  #this is the string of hashes that we push to Fusion as documents
 
     events.each do |event|
-        documents << LogStash::Json.dump( mutate( event.to_hash() ) ) << "\n"
+        documents << LogStash::Json.dump( mutate( event.to_hash(), event ) ) << "\n"
+#        @logger.info(LogStash::Json.dump( mutate( event.to_hash(), event ) ) << "\n")
     end
 
     hosts = get_host_addresses()
@@ -226,6 +233,7 @@ class LogStash::Outputs::ClickHouse < LogStash::Outputs::Base
           end
         else
           @logger.info("Retrying request", :url => url, :message => response.message, :response => response.body, :uuid => uuid)
+          @logger.info(documents)
           delay_attempt(req_count, @backoff_time)
           make_request(documents, hosts, query, con_count, req_count+1, host, uuid)
         end

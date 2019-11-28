@@ -16,6 +16,7 @@ Please note that the name of the plugin when used is `clickhouse`, it only suppo
         mutations => {
           "to1" => "from1"
           "to2" => [ "from2", "(.)(.)", '\1\2' ]
+          "to3" => "%{[@metadata][from3]}"
         }
       }
     }
